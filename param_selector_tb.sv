@@ -2,7 +2,7 @@
 
 module param_selector_tb;
 
-
+// continuously changing/adding parameter names after testing of the module skeleton, may no longer be up to date
 
     logic clk;
     logic rst;
@@ -12,21 +12,22 @@ module param_selector_tb;
     logic set;
     logic [15:0] sw;
     
-    logic [2:0] oversampling_factor;
+    logic [2:0] MUSICAL_SCALE_factor;
     logic [15:0] sampling_rate;
     logic [1:0] mode;
     logic [11:0] color;
     logic live;
-    logic [2:0] state;
+    logic [3:0] button_state;
+    logic [2:0] selector_val;
     
     
 
-    param_selector uut (.clk_100mhz(clk), .rst(rst), 
+    param_selector uut (.clk_65mhz(clk), .rst(rst), 
                         .down(down), .up(up),
                         .next(next), .set(set),
-                        .sw(sw), .oversampling_factor(oversampling_factor),
+                        .sw(sw), .MUSICAL_SCALE_factor(MUSICAL_SCALE_factor),
                         .sampling_rate(sampling_rate), .mode(mode), 
-                        .live(live), .state(state), .color(color));
+                        .live(live), .button_state(button_state), .color(color), .selector_val(selector_val));
     
     
     
@@ -51,7 +52,7 @@ module param_selector_tb;
         
         for (int i = 0; i < 5; i = i+1) begin //  flip through all the states
             up = 1;
-            #10;
+            #20;
             up = 0;
             #100;
         end
@@ -62,13 +63,13 @@ module param_selector_tb;
             #100;
         end
         
-        //in effect mode
+        //in MAGNITUDE_SCALE mode
         next = 1;
-        #10;
+        #20;
         next = 0;
         #50;
         next = 1;
-        #10;
+        #20;
         next = 0;
         #100;
         
