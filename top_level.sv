@@ -163,7 +163,19 @@ module top_level(   input clk_100mhz,
 //      FFT outputs -> BRAMs
 //
 //////////////////////////////////////
-    
+  
+    /* This is where you would find the answers to Mark's spec questions, I rewatched the video and I'm not entirely sure what he is talking about,
+       the lines on the spec cross each other but you can still tell they are mirrored and just representing one frequency. If he was asking why you only see
+       one frequency peak in the bottom, that's because the bottom only happened to be displaying the first, nonmirrored, half of the data, but that is something
+       that can be changed with the parameter selection.
+       
+       To have the spec only display the first half, or at least always have the spec and magnitude graphs displaying the same thing, I could have either stop 
+       recording data into the spec after 1024 and then just only recorded every other data. Or I could have indexed into the bram differently, involving a tad
+       more scaling than just the indexing into the bram with only hcount and vcount. Sorry that neither of those things did get implemented, I did not realize
+       that spectrograms only ever showed the first half of the fft data, and I wanted to make sure the other parts of the project got done as well.
+       
+       Hope that helps explain a bit :)
+    */
     logic [1:0] spec_bram_count;
     logic spec_bram_flag;
     
@@ -174,6 +186,7 @@ module top_level(   input clk_100mhz,
                 spec_bram_addr <= spec_bram_addr + 1;         // allign spec
                 spec_bram_count <= 0;                         // reset count
             end else if (spec_bram_count == 2'b11) begin      // write every 4th value to bram (scale 2048 down to 256)
+                    // ^^ this is why it's mirrored, because I just take every 4th value between 0-2048 instead of every other value between 0-1024
                     addr_count <= addr_count + 1'b1;          // always update live mags
                     spec_bram_addr <= spec_bram_addr + 1'b1;  // increase spec bram address
                     spec_bram_count <= 0;                     // count back to 0
@@ -610,6 +623,7 @@ module top_level(   input clk_100mhz,
             
                 // gets the spec bram address
                 spec_draw_addr <= ((hcount - SPEC_LOC_X)*SPEC_SIZE - (vcount - SPEC_LOC_Y));  
+                // ^^ could've also changed this based on wheteher the user wanted the mirrored or unmirrored spec to display
                                    
                 // read the spec values
                 rgb <= spec_pixels;
