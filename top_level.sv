@@ -245,7 +245,127 @@ module top_level(   input clk_100mhz,
                     .addrb(spec_draw_addr), .clkb(pixel_clk), .doutb(spec_pixels),
                     .web(1'b0), .enb(1'b1));
                 
+    // THIS IS WHERE THE SYNTHESIS PORTION STARTS
 
+    logic [31:0]    fft_val;
+
+    // Intermediate values
+    logic [31:0] fund_val;
+    logic [15:0] fund_index; // FFT_size is 2048
+    logic [31:0] second_val;
+    logic [15:0] second_index;
+    logic [31:0] third_val;
+    logic [15:0] third_index;
+    logic [31:0] fourth_val;
+    logic [15:0] fourth_index;
+    logic        done;
+    logic [23:0]    fcw1;
+    logic [23:0]    fcw2;
+    logic [23:0]    fcw3;
+    logic [23:0]    fcw4;
+    
+    // Output sine wave
+    logic [11:0]    sin_out1;
+    logic [11:0]    sin_out2;
+    logic [11:0]    sin_out3;
+    logic [11:0]    sin_out4;
+    logic [11:0]    true_sin_out;
+    
+    assign true_sin_out = (sin_out1 >> 1) + (sin_out2 >> 1) + (sin_out3 >> 2) + (sin_out4 >> 2); 
+
+    // lab5a vals
+    logic [15:0] sample_counter;
+    logic [11:0] sample_gen_data;
+    logic [7:0] vol_out;
+    logic pwm_val; //pwm signal (HI/LO)
+    logic sample_trigger2;
+    logic [1:0] scale_choice;
+    
+    assign scale_choice = sw[8:7];
+
+
+    assign aud_sd = 1;
+    assign sample_trigger2 = (sample_counter == SAMPLE_COUNT);
+
+    always_ff @(posedge clk_100mhz)begin
+        if (sample_counter == SAMPLE_COUNT)begin
+            sample_counter <= 16'b0;
+        end else begin
+            sample_counter <= sample_counter + 16'b1;
+        end
+        if (sample_trigger2) begin
+            sample_gen_data <= {~true_sin_out[11],true_sin_out[10:4]}; // data is already in offset binary
+            //https://en.wikipedia.org/wiki/Offset_binary
+        end
+    end
+
+    // EVERYTHING UNTIL THIS POINT WAS IN LAB5A
+
+    ///////////////
+    /// TEST VALS
+    ///////////////
+    logic [5:0]  test_harmonic_counter;
+    logic [31:0] test_fft_mem;
+    logic        find_harmoincs_test;
+
+    ///////////////
+    // PEAK FINDER
+    ///////////////
+    peak_finder_v4 #(.FFT_SIZE('d1024), .ROI('d3)) v3_test (.clk(clk_100mhz), .reset(btnd), .t_valid(sqsum_valid), .fft_val(sqsum_data[31:0]),
+                            .fund_val(fund_val), .fund_index(fund_index),
+                            .second_val(second_val), .second_index(second_index),
+                            .third_val(third_val), .third_index(third_index),
+                            .fourth_val(fourth_val), .fourth_index(fourth_index),
+                            .done(done),
+                            
+                            // Test vals
+                            .harmonic_counter_test(test_harmonic_counter),
+                            .fft_mem_test(test_fft_mem),
+                            .find_harmonics_test(find_harmonics_test)
+                        );
+                        
+    ///////////////
+    /// ILA
+    ///////////////
+    //ila_0 myila (.clk(clk_100mhz), .probe0(sqrt_data), .probe1(fund_val), .probe2(second_val), .probe3(fund_index), .probe4(second_index), .probe5(third_index), .probe6(sqrt_valid), .probe7(done), .probe8(find_harmonics_test), .probe9(test_harmonic_counter), .probe10(test_fft_mem));
+    ila_0 myila (.clk(clk_100mhz), .probe0(sqsum_valid), .probe1(sqsum_data));
+
+    ///////////////
+    /// TUNING
+    ///////////////
+    tuning tune_test1 (.clk(clk_100mhz), .rst(btnd), .fundamental_index(fund_index),
+                      .scale_choice(scale_choice), .fcw(fcw1));
+    tuning tune_test2 (.clk(clk_100mhz), .rst(btnd), .fundamental_index(second_index),
+                      .scale_choice(scale_choice), .fcw(fcw2));
+    tuning tune_test3 (.clk(clk_100mhz), .rst(btnd), .fundamental_index(third_index),
+                      .scale_choice(scale_choice), .fcw(fcw3));
+    tuning tune_test4 (.clk(clk_100mhz), .rst(btnd), .fundamental_index(fourth_index),
+                      .scale_choice(scale_choice), .fcw(fcw4));
+    
+    ///////////////
+    /// SINE GENERATION
+    ///////////////
+    sine_resyn resyn_test (.clk(clk_100mhz), .reset(btnd), .fcw(fcw1),
+                      .sin_out(sin_out1));
+    sine_resyn resyn_test1 (.clk(clk_100mhz), .reset(btnd), .fcw(fcw2),
+                      .sin_out(sin_out2));
+    sine_resyn resyn_test2 (.clk(clk_100mhz), .reset(btnd), .fcw(fcw3),
+                      .sin_out(sin_out3));
+    sine_resyn resyn_test3 (.clk(clk_100mhz), .reset(btnd), .fcw(fcw4),
+                      .sin_out(sin_out4));
+
+
+    ///////////////
+    /// VOLUME
+    ///////////////
+    volume_control vc (.vol_in(sw[15:13]),
+                       .signal_in(sample_gen_data), .signal_out(vol_out));
+
+    ///////////////
+    /// AUDIO OUTPUT
+    ///////////////
+    pwm (.clk_in(clk_100mhz), .rst_in(btnd), .level_in({~vol_out[7],vol_out[6:0]}), .pwm_out(pwm_val));
+    assign aud_pwm = pwm_val?1'bZ:1'b0; 
 
 //////////////////////////////////////
 //      
@@ -741,78 +861,24 @@ module debounce (input reset_in, clock_in, noisy_in,
 
 endmodule
 
+//PWM generator for audio generation!
+module pwm (input clk_in, input rst_in, input [7:0] level_in, output logic pwm_out);
+    logic [7:0] count;
+    assign pwm_out = count<level_in;
+    always_ff @(posedge clk_in)begin
+        if (rst_in)begin
+            count <= 8'b0;
+        end else begin
+            count <= count+8'b1;
+        end
+    end
+endmodule
 
-
-////////////////////////////////////////////////////////////////////////////////////
-//// Update: 8/8/2019 GH 
-//// Create Date: 10/02/2015 02:05:19 AM
-//// Module Name: xvga
-////
-//// xvga: Generate VGA display signals (1024 x 768 @ 60Hz)
-////
-////                              ---- HORIZONTAL -----     ------VERTICAL -----
-////                              Active                    Active
-////                    Freq      Video   FP  Sync   BP      Video   FP  Sync  BP
-////   640x480, 60Hz    25.175    640     16    96   48       480    11   2    31
-////   800x600, 60Hz    40.000    800     40   128   88       600     1   4    23
-////   1024x768, 60Hz   65.000    1024    24   136  160       768     3   6    29
-////   1280x1024, 60Hz  108.00    1280    48   112  248       768     1   3    38
-////   1280x720p 60Hz   75.25     1280    72    80  216       720     3   5    30
-////   1920x1080 60Hz   148.5     1920    88    44  148      1080     4   5    36
-////
-//// change the clock frequency, front porches, sync's, and back porches to create 
-//// other screen resolutions
-//////////////////////////////////////////////////////////////////////////////////
-
-//module xvga(input vclock_in,
-//            output logic [10:0] hcount_out,    // pixel number on current line
-//            output logic [9:0] vcount_out,     // line number
-//            output logic vsync_out, hsync_out,
-//            output logic blank_out);
-
-//   parameter DISPLAY_WIDTH  = 1024;      // display width
-//   parameter DISPLAY_HEIGHT = 768;       // number of lines
-
-//   parameter  H_FP = 24;                 // horizontal front porch
-//   parameter  H_SYNC_PULSE = 136;        // horizontal sync
-//   parameter  H_BP = 160;                // horizontal back porch
-
-//   parameter  V_FP = 3;                  // vertical front porch
-//   parameter  V_SYNC_PULSE = 6;          // vertical sync 
-//   parameter  V_BP = 29;                 // vertical back porch
-
-//   // horizontal: 1344 pixels total
-//   // display 1024 pixels per line
-//   logic hblank,vblank;
-//   logic hsyncon,hsyncoff,hreset,hblankon;
-//   assign hblankon = (hcount_out == (DISPLAY_WIDTH -1));    
-//   assign hsyncon = (hcount_out == (DISPLAY_WIDTH + H_FP - 1));  //1047
-//   assign hsyncoff = (hcount_out == (DISPLAY_WIDTH + H_FP + H_SYNC_PULSE - 1));  // 1183
-//   assign hreset = (hcount_out == (DISPLAY_WIDTH + H_FP + H_SYNC_PULSE + H_BP - 1));  //1343
-
-//   // vertical: 806 lines total
-//   // display 768 lines
-//   logic vsyncon,vsyncoff,vreset,vblankon;
-//   assign vblankon = hreset & (vcount_out == (DISPLAY_HEIGHT - 1));   // 767 
-//   assign vsyncon = hreset & (vcount_out == (DISPLAY_HEIGHT + V_FP - 1));  // 771
-//   assign vsyncoff = hreset & (vcount_out == (DISPLAY_HEIGHT + V_FP + V_SYNC_PULSE - 1));  // 777
-//   assign vreset = hreset & (vcount_out == (DISPLAY_HEIGHT + V_FP + V_SYNC_PULSE + V_BP - 1)); // 805
-
-//   // sync and blanking
-//   logic next_hblank,next_vblank;
-//   assign next_hblank = hreset ? 0 : hblankon ? 1 : hblank;
-//   assign next_vblank = vreset ? 0 : vblankon ? 1 : vblank;
-//   always_ff @(posedge vclock_in) begin
-//      hcount_out <= hreset ? 0 : hcount_out + 1;
-//      hblank <= next_hblank;
-//      hsync_out <= hsyncon ? 0 : hsyncoff ? 1 : hsync_out;  // active low
-
-//      vcount_out <= hreset ? (vreset ? 0 : vcount_out + 1) : vcount_out;
-//      vblank <= next_vblank;
-//      vsync_out <= vsyncon ? 0 : vsyncoff ? 1 : vsync_out;  // active low
-
-//      blank_out <= next_vblank | (next_hblank & ~hreset);
-//   end
-//endmodule
+//Volume Control
+module volume_control (input [2:0] vol_in, input signed [7:0] signal_in, output logic signed[7:0] signal_out);
+    logic [2:0] shift;
+    assign shift = 3'd7 - vol_in;
+    assign signal_out = signal_in>>>shift;
+endmodule
 
       
