@@ -98,12 +98,12 @@ module param_selector(
                 SCROLL_FUNCTION: begin
                     case (selector_val) // scrolls through different things depending on which param you're changing
                         MAGNITUDE_SCALE: begin   // shifts through the values on the magnitude scale
-                            case (scale) 
-                                2'b00 : scale <= 2'b01;
-                                2'b01 : scale <= 2'b10;
-                                2'b10 : scale <= 2'b11;
-                                2'b11 : scale <= 2'b00;
-                                default : scale <= 2'b00;                       
+                                case (mag_scale) 
+                                2'b00 : mag_scale <= 2'b01;
+                                2'b01 : mag_scale <= 2'b10;
+                                2'b10 : mag_scale <= 2'b11;
+                                2'b11 : mag_scale <= 2'b00;
+                                default : mag_scale <= 2'b00;                       
                             endcase
                         end
                         SHOW_LIVE : live <= !live;      // switches the display mode (half or full)
