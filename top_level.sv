@@ -20,7 +20,8 @@ module top_level(   input clk_100mhz,
                     output logic aud_sd
     );  
 
- 
+    parameter SAMPLE_COUNT = 2082;//gets approximately (will generate audio at approx 48 kHz sample rate.
+
     logic [11:0] adc_data;
     logic sample_trigger;
     logic adc_ready;            
@@ -294,7 +295,7 @@ module top_level(   input clk_100mhz,
     logic sample_trigger2;
     logic [1:0] scale_choice;
     
-    assign scale_choice = sw[8:7];
+//     assign scale_choice = sw[8:7];
 
 
     assign aud_sd = 1;
@@ -341,7 +342,7 @@ module top_level(   input clk_100mhz,
     /// ILA
     ///////////////
     //ila_0 myila (.clk(clk_100mhz), .probe0(sqrt_data), .probe1(fund_val), .probe2(second_val), .probe3(fund_index), .probe4(second_index), .probe5(third_index), .probe6(sqrt_valid), .probe7(done), .probe8(find_harmonics_test), .probe9(test_harmonic_counter), .probe10(test_fft_mem));
-    ila_0 myila (.clk(clk_100mhz), .probe0(sqsum_valid), .probe1(sqsum_data));
+//     ila_0 myila (.clk(clk_100mhz), .probe0(sqsum_valid), .probe1(sqsum_data));
 
     ///////////////
     /// TUNING
@@ -386,7 +387,7 @@ module top_level(   input clk_100mhz,
 //
 //////////////////////////////////////
                     
-    logic [1:0] musical_scale;
+//     logic [1:0] musical_scale;
     logic [1:0] mag_scale;
     logic [11:0] color;
     logic live;
@@ -394,7 +395,7 @@ module top_level(   input clk_100mhz,
     logic [3:0] button_state;
     // instantiate module for selecting parameters for display
     param_selector(.clk_65mhz(pixel_clk),.rst(rst),.up(clean_up),.down(clean_down),.next(clean_right),.set(clean_left),.sw(clean_sw),
-                    .scale_choice(musical_scale),.scale_color(scale_color),.mag_scale(mag_scale),.color(color),
+                   .scale_choice(scale_choice),.scale_color(scale_color),.mag_scale(mag_choice),.color(color),
                     .live(live),.button_state(button_state), .selector_val(param));
            
     // param visuals
@@ -731,7 +732,7 @@ module top_level(   input clk_100mhz,
                 default: color_scale_x <= COLOR_SCALE_LOC_X;
             endcase
             
-            case (musical_scale)
+      case (scale_choice)
                 // location of selector under different music scales
                 2'b00 : musical_scale_sel_x <= MUSICAL_SCALE_LOC_X + 20;                 // c major
                 2'b01 : musical_scale_sel_x <= MUSICAL_SCALE_LOC_X + 20 + 115;           // f major
