@@ -171,13 +171,13 @@ module top_level(   input clk_100mhz,
        that can be changed with the parameter selection.
        
        To have the spec only display the first half, or at least always have the spec and magnitude graphs displaying the same thing, I could have either stop 
-       recording data into the spec after 1024 and then just only recorded every other data. Or I could have indexed into the bram differently, involving a tad
+       recording data into the spec after 1024 and then just only recorded every 4th data point. Or I could have indexed into the bram differently, involving a tad
        more scaling than just the indexing into the bram with only hcount and vcount. Sorry that neither of those things did get implemented, I did not realize
        that spectrograms only ever showed the first half of the fft data, and I wanted to make sure the other parts of the project got done as well.
        
        Hope that helps explain a bit :)
     */
-    logic [1:0] spec_bram_count;
+    logic [2:0] spec_bram_count;
     logic spec_bram_flag;
     
     always_ff @(posedge clk_100mhz)begin
@@ -186,8 +186,8 @@ module top_level(   input clk_100mhz,
                 addr_count <= 'd2047; //allign
                 spec_bram_addr <= spec_bram_addr + 1;         // allign spec
                 spec_bram_count <= 0;                         // reset count
-            end else if (spec_bram_count == 2'b11) begin      // write every 4th value to bram (scale 2048 down to 256)
-                    // ^^ this is why it's mirrored, because I just take every 4th value between 0-2048 instead of every other value between 0-1024
+            end else if (spec_bram_count == 2'b111) begin     // write every 8th value to bram (scale 2048 down to 256)
+                    // ^^ this is why it's mirrored, because I just take every 8th value between 0-2048 instead of every 4th value between 0-1024
                     addr_count <= addr_count + 1'b1;          // always update live mags
                     spec_bram_addr <= spec_bram_addr + 1'b1;  // increase spec bram address
                     spec_bram_count <= 0;                     // count back to 0
